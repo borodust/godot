@@ -1144,6 +1144,9 @@ String OS_Unix::get_user_data_dir(const String &p_user_dir) const {
 }
 
 String OS_Unix::get_executable_path() const {
+	if (!OS::get_executable_path().is_empty()) {
+		return OS::get_executable_path();
+	}
 #ifdef __linux__
 	//fix for running from a symlink
 	char buf[PATH_MAX];

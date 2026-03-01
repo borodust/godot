@@ -622,6 +622,10 @@ void EditorNode::_update_from_settings() {
 #endif // DEBUG_ENABLED
 }
 
+void EditorNode::_gdextension_loaded(const Ref<GDExtension> &p_extension) {
+	_gdextensions_reloaded();
+}
+
 void EditorNode::_gdextensions_reloaded() {
 	// In case the developer is inspecting an object that will be changed by the reload.
 	InspectorDock::get_inspector_singleton()->update_tree();
@@ -8409,6 +8413,7 @@ EditorNode::EditorNode() {
 	EditorUndoRedoManager::get_singleton()->connect("history_changed", callable_mp(this, &EditorNode::_update_unsaved_cache));
 	ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &EditorNode::_update_from_settings));
 	GDExtensionManager::get_singleton()->connect("extensions_reloaded", callable_mp(this, &EditorNode::_gdextensions_reloaded));
+	GDExtensionManager::get_singleton()->connect("extension_loaded", callable_mp(this, &EditorNode::_gdextension_loaded));
 
 	Ref<TranslationDomain> domain = TranslationServer::get_singleton()->get_main_domain();
 	domain->set_enabled(false);

@@ -262,9 +262,9 @@ void CrashHandler::disable() {
 	}
 
 #ifdef CRASH_HANDLER_ENABLED
-	signal(SIGSEGV, SIG_DFL);
-	signal(SIGFPE, SIG_DFL);
-	signal(SIGILL, SIG_DFL);
+	// signal(SIGSEGV, SIG_DFL);
+	// signal(SIGFPE, SIG_DFL);
+	// signal(SIGILL, SIG_DFL);
 #endif
 
 	disabled = true;
@@ -272,8 +272,8 @@ void CrashHandler::disable() {
 
 void CrashHandler::initialize() {
 #ifdef CRASH_HANDLER_ENABLED
-	signal(SIGSEGV, handle_crash);
-	signal(SIGFPE, handle_crash);
-	signal(SIGILL, handle_crash);
+	// signal(SIGSEGV, handle_crash);
+	// signal(SIGFPE, handle_crash);
+	// signal(SIGILL, handle_crash);
 #endif
 }

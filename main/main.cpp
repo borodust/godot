@@ -219,6 +219,7 @@ static bool cmdline_tool = false;
 static String locale;
 static String log_file;
 static bool show_help = false;
+static bool projectless = false;
 static uint64_t quit_after = 0;
 static ProcessID editor_pid = 0;
 #ifdef TOOLS_ENABLED
@@ -556,6 +557,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("-v, --verbose", "Use verbose stdout mode.\n");
 	print_help_option("--quiet", "Quiet mode, silences stdout messages. Errors are still displayed.\n");
 	print_help_option("--no-header", "Do not print engine version and rendering driver/method header on startup.\n");
+	print_help_option("--projectless", "Allow starting Godot without path, if --main-loop is provided.\n");
 
 	print_help_title("Run options");
 	print_help_option("--, ++", "Separator for user-provided arguments. Following arguments are not used by the engine, but can be read from `OS.get_cmdline_user_args()`.\n");
@@ -1219,6 +1221,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		} else if (arg == "-v" || arg == "--verbose") { // verbose output
 
 			OS::get_singleton()->_verbose_stdout = true;
+		} else if (arg == "--projectless") {
+			projectless = true;
 		} else if (arg == "-q" || arg == "--quiet") { // quieter output
 
 			quiet_stdout = true;
@@ -2071,6 +2075,16 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	}
 
 #ifdef TOOLS_ENABLED
+	if (editor && projectless) {
+		OS::get_singleton()->print(
+				"Error: Command line arguments implied opening both editor and projectless mode, which is not possible. Aborting.\n");
+		goto error;
+	}
+	if (project_manager && projectless) {
+		OS::get_singleton()->print(
+				"Error: Command line arguments implied opening both project manager and projectless mode, which is not possible. Aborting.\n");
+		goto error;
+	}
 	if (editor && project_manager) {
 		OS::get_singleton()->print(
 				"Error: Command line arguments implied opening both editor and project manager, which is not possible. Aborting.\n");
@@ -2103,7 +2117,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 #ifdef TOOLS_ENABLED
 		found_project = true;
 #endif
-	} else {
+	} else if (!projectless) {
 #ifdef TOOLS_ENABLED
 		editor = false;
 #else
@@ -2146,7 +2160,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	}
 
 #ifdef TOOLS_ENABLED
-	if (!project_manager && !editor) {
+	if (!project_manager && !editor && !projectless) {
 		// If we didn't find a project, we fall back to the project manager.
 		project_manager = !found_project && !cmdline_tool;
 	}
@@ -4018,6 +4032,7 @@ int Main::start() {
 	String script;
 	String main_loop_type;
 	bool check_only = false;
+	bool provided_main_loop = false;
 
 #ifdef TOOLS_ENABLED
 	String doc_tool_path;
@@ -4115,6 +4130,7 @@ int Main::start() {
 				script = E->next()->get();
 			} else if (E->get() == "--main-loop") {
 				main_loop_type = E->next()->get();
+				provided_main_loop = true;
 #ifdef TOOLS_ENABLED
 			} else if (E->get() == "--doctool") {
 				doc_tool_path = E->next()->get();
@@ -4317,18 +4333,20 @@ int Main::start() {
 
 #if defined(OVERRIDE_PATH_ENABLED)
 	bool disable_override = GLOBAL_GET("application/config/disable_project_settings_override");
-	if (disable_override) {
+	if (disable_override && !projectless) {
 		script = String();
 		game_path = String();
 		main_loop_type = String();
 	}
 #else
-	script = String();
-	game_path = String();
-	main_loop_type = String();
+	if (!projectless) {
+		script = String();
+		game_path = String();
+		main_loop_type = String();
+	}
 #endif // defined(OVERRIDE_PATH_ENABLED)
 
-	if (script.is_empty() && game_path.is_empty()) {
+	if (!projectless && script.is_empty() && game_path.is_empty()) {
 		const String main_scene = GLOBAL_GET("application/run/main_scene");
 		if (main_scene.begins_with("uid://")) {
 			ResourceUID::ID id = ResourceUID::get_singleton()->text_to_id(main_scene);
@@ -4343,7 +4361,7 @@ int Main::start() {
 	}
 
 #ifdef TOOLS_ENABLED
-	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && game_path.is_empty()) {
+	if (!editor && !project_manager && !cmdline_tool && !projectless && script.is_empty() && game_path.is_empty()) {
 		// If we end up here, it means we didn't manage to detect what we want to run.
 		// Let's throw an error gently. The code leading to this is pretty brittle so
 		// this might end up triggered by valid usage, in which case we'll have to
@@ -4358,7 +4376,9 @@ int Main::start() {
 		main_loop = memnew(SceneTree);
 	}
 	if (main_loop_type.is_empty()) {
-		main_loop_type = GLOBAL_GET("application/run/main_loop_type");
+		if (!projectless || provided_main_loop) {
+			main_loop_type = GLOBAL_GET("application/run/main_loop_type");
+		}
 	}
 
 	if (!script.is_empty()) {
@@ -4410,6 +4430,10 @@ int Main::start() {
 	}
 
 	if (!main_loop && main_loop_type.is_empty()) {
+		if (projectless) {
+			OS::get_singleton()->alert("Error: --projectless was provided, but no --main-loop or --script was specified. Aborting.");
+			ERR_FAIL_V_MSG(EXIT_FAILURE, "Error: --projectless was provided, but no --main-loop or --script was specified. Aborting.");
+		}
 		main_loop_type = "SceneTree";
 	}
 
@@ -4753,7 +4777,7 @@ int Main::start() {
 			// Load SSL Certificates from Project Settings (or builtin).
 			Crypto::load_default_certificates(GLOBAL_GET("network/tls/certificate_bundle_override"));
 
-			if (!game_path.is_empty()) {
+	if (!projectless && !game_path.is_empty()) {
 				Node *scene = nullptr;
 				Ref<PackedScene> scenedata = ResourceLoader::load(local_game_path);
 				if (scenedata.is_valid()) {

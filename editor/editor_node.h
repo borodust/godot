@@ -618,6 +618,7 @@ private:
 
 	void _update_vsync_mode();
 	void _update_from_settings();
+	void _gdextension_loaded(const Ref<GDExtension> &);
 	void _gdextensions_reloaded();
 	void _update_translations();
 	void _translation_resources_changed();

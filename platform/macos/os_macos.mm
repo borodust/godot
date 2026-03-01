@@ -795,6 +795,9 @@ String OS_MacOS::get_system_font_path(const String &p_font_name, int p_weight, i
 }
 
 String OS_MacOS::get_executable_path() const {
+	if (!OS::get_executable_path().is_empty()) {
+		return OS::get_executable_path();
+	}
 	char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
 	int pid = getpid();
 	pid_t ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));

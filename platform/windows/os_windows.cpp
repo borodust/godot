@@ -2059,6 +2059,9 @@ String OS_Windows::get_system_font_path(const String &p_font_name, int p_weight,
 }
 
 String OS_Windows::get_executable_path() const {
+	if (!OS::get_executable_path().is_empty()) {
+		return OS::get_executable_path();
+	}
 	WCHAR bufname[4096];
 	GetModuleFileNameW(nullptr, bufname, 4096);
 	String s = String::utf16((const char16_t *)bufname).replace_char('\\', '/');
