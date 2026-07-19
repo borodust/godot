@@ -875,6 +875,10 @@ void main() {
 #define OUTPUT_IS_MULTIVIEW false
 #endif
 
+#ifdef BARYCENTRIC_USED
+#extension GL_EXT_fragment_shader_barycentric : enable
+#endif
+
 /* Include half precision types. */
 #include "../half_inc.glsl"
 
