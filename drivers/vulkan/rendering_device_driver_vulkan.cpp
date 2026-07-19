@@ -586,6 +586,9 @@ Error RenderingDeviceDriverVulkan::_initialize_device_extensions() {
 	_register_requested_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, false);
 	_register_requested_device_extension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, false);
 	_register_requested_device_extension(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME, false);
+	_register_requested_device_extension(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME, false);
+	_register_requested_device_extension(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME, false);
+	_register_requested_device_extension(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME, false);
 
 	// We don't actually use this extension, but some runtime components on some platforms
 	// can and will fill the validation layers with useless info otherwise if not enabled.
@@ -916,6 +919,8 @@ Error RenderingDeviceDriverVulkan::_check_device_capabilities() {
 		VkPhysicalDeviceRayTracingPipelineFeaturesKHR raytracing_pipeline_features = {};
 		VkPhysicalDeviceSynchronization2FeaturesKHR sync_2_features = {};
 		VkPhysicalDeviceRayTracingValidationFeaturesNV raytracing_validation_features = {};
+		VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR barycentric_features = {};
+		VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR compute_derivatives_features = {};
 
 		const bool use_1_2_features = physical_device_properties.apiVersion >= VK_API_VERSION_1_2;
 		if (use_1_2_features) {
@@ -1006,6 +1011,19 @@ Error RenderingDeviceDriverVulkan::_check_device_capabilities() {
 			next_features = &sync_2_features;
 		}
 
+		if (enabled_device_extension_names.has(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME)) {
+			barycentric_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_KHR;
+			barycentric_features.pNext = next_features;
+			next_features = &barycentric_features;
+		}
+
+		// VK_NV_compute_shader_derivatives was promoted to VK_KHR_compute_shader_derivatives; both share the same feature struct and sType.
+		if (enabled_device_extension_names.has(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) || enabled_device_extension_names.has(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+			compute_derivatives_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR;
+			compute_derivatives_features.pNext = next_features;
+			next_features = &compute_derivatives_features;
+		}
+
 		VkPhysicalDeviceFeatures2 device_features_2 = {};
 		device_features_2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		device_features_2.pNext = next_features;
@@ -1093,6 +1111,15 @@ Error RenderingDeviceDriverVulkan::_check_device_capabilities() {
 		if (enabled_device_extension_names.has(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)) {
 			raytracing_capabilities.raytracing_pipeline_support = raytracing_pipeline_features.rayTracingPipeline;
 			raytracing_capabilities.validation = raytracing_validation_features.rayTracingValidation;
+		}
+
+		if (enabled_device_extension_names.has(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME)) {
+			fragment_shader_barycentric_support = barycentric_features.fragmentShaderBarycentric;
+		}
+
+		if (enabled_device_extension_names.has(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) || enabled_device_extension_names.has(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+			compute_shader_derivative_group_quads_support = compute_derivatives_features.computeDerivativeGroupQuads;
+			compute_shader_derivative_group_linear_support = compute_derivatives_features.computeDerivativeGroupLinear;
 		}
 	}
 
@@ -1439,6 +1466,23 @@ Error RenderingDeviceDriverVulkan::_initialize_device(const LocalVector<VkDevice
 		raytracing_validation_features.pNext = create_info_next;
 		raytracing_validation_features.rayTracingValidation = raytracing_capabilities.validation;
 		create_info_next = &raytracing_validation_features;
+	}
+
+	VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR barycentric_features = {};
+	if (fragment_shader_barycentric_support) {
+		barycentric_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_KHR;
+		barycentric_features.pNext = create_info_next;
+		barycentric_features.fragmentShaderBarycentric = fragment_shader_barycentric_support;
+		create_info_next = &barycentric_features;
+	}
+
+	VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR compute_derivatives_features = {};
+	if (compute_shader_derivative_group_quads_support || compute_shader_derivative_group_linear_support) {
+		compute_derivatives_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR;
+		compute_derivatives_features.pNext = create_info_next;
+		compute_derivatives_features.computeDerivativeGroupQuads = compute_shader_derivative_group_quads_support;
+		compute_derivatives_features.computeDerivativeGroupLinear = compute_shader_derivative_group_linear_support;
+		create_info_next = &compute_derivatives_features;
 	}
 
 	VkPhysicalDeviceVulkan11Features vulkan_1_1_features = {};
