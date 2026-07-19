@@ -746,6 +746,7 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.renames["FRAGCOORD"] = "gl_FragCoord";
 		actions.renames["FRONT_FACING"] = "gl_FrontFacing";
 		actions.renames["BARYCENTRIC"] = "gl_BaryCoordEXT";
+		actions.renames["PRIMITIVE_ID"] = "gl_PrimitiveID";
 		actions.renames["NORMAL_MAP"] = "normal_map";
 		actions.renames["NORMAL_MAP_DEPTH"] = "normal_map_depth";
 		actions.renames["BENT_NORMAL_MAP"] = "bent_normal_map";
